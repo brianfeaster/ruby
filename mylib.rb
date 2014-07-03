@@ -15,5 +15,6 @@ module MyLib
           print x, " @= ", val, "\n"
       end # case r.type
     end # r.keys
-  end
-end
+    STDOUT.flush
+  end # def self.dumpRedis
+end # module MyLib

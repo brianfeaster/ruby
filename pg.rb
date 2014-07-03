@@ -18,13 +18,13 @@ C100M = C10M  * C10
 # Reset tables
 #
 def resetUsers
-  $conn.exec("drop table users");
-  $conn.exec("CREATE TABLE users (id SERIAL, email TEXT PRIMARY KEY, name TEXT)");
+  $conn.exec("drop table account");
+  $conn.exec("CREATE TABLE accounts (id SERIAL, email TEXT PRIMARY KEY, name TEXT)");
 end
 
 def resetContent
   $conn.exec("drop table content");
-  $conn.exec("CREATE TABLE content (id SERIAL PRIMARY KEY, content TEXT)");
+  $conn.exec("CREATE TABLE contents (id SERIAL PRIMARY KEY, content TEXT)");
 end
 
 def resetUserSeen
@@ -88,7 +88,7 @@ def generateRandomUsers (count)
     # Email
     email = createRandomEmail
     #print nameFirst, Array.new(20-fullName.length+2).join(' '), nameLast, " ", email, "\n"
-    query = "INSERT INTO users (email, name) VALUES('" + email + "', '" + fullName + "')"
+    query = "INSERT INTO accounts (email, name) VALUES('" + email + "', '" + fullName + "')"
     #puts query
     begin
       $conn.exec(query)
@@ -102,17 +102,17 @@ end
 
 
 #
-# Debug dump the user and content tables
+# Debug dump the account and content tables
 #
 def dumpDataTables
   print " ------ " + Array.new(34).join('-') + " " + Array.new(21).join('-')
-  $conn.exec("SELECT * FROM users") do |result|
+  $conn.exec("SELECT * FROM accounts") do |result|
      result.each do |row|
         print "\n %6d %-33s %-20s" % row.values_at('id', 'email', 'name')
      end
   end
   print "\n ------ " + Array.new(50).join('-')
-  $conn.exec("SELECT * FROM content") do |result|
+  $conn.exec("SELECT * FROM contents") do |result|
      result.each do |row|
         print "\n %6d %s" % row.values_at('id', 'description')
      end
@@ -129,7 +129,7 @@ def generateRandomContent (count)
   for h in 1 .. count
     content = "";
     (8 + rand(42)).times{content << (97 + rand(26)).chr}
-    query = "INSERT INTO content (content) VALUES('" + content + "')"
+    query = "INSERT INTO contents (content) VALUES('" + content + "')"
     $conn.exec(query)
   end
 end
