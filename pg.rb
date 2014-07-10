@@ -14,16 +14,20 @@ C10M  = C1M   * C10
 C100M = C10M  * C10
 
 
+$howMany = C100 
+$conn = PG.connect(dbname: 'freelogue')    # Create DB connection
+
+
 #
 # Reset tables
 #
 def resetUsers
-  $conn.exec("drop table account");
+  $conn.exec("drop table accounts");
   $conn.exec("CREATE TABLE accounts (id SERIAL, email TEXT PRIMARY KEY, name TEXT)");
 end
 
 def resetContent
-  $conn.exec("drop table content");
+  $conn.exec("drop table contents");
   $conn.exec("CREATE TABLE contents (id SERIAL PRIMARY KEY, content TEXT)");
 end
 
@@ -105,54 +109,143 @@ end
 # Debug dump the account and content tables
 #
 def dumpDataTables
-  print " ------ " + Array.new(34).join('-') + " " + Array.new(21).join('-')
+  print " ------ Accounts" + Array.new(34).join('-') + " " + Array.new(21).join('-')
   $conn.exec("SELECT * FROM accounts") do |result|
      result.each do |row|
         print "\n %6d %-33s %-20s" % row.values_at('id', 'email', 'name')
      end
   end
-  print "\n ------ " + Array.new(50).join('-')
+  print "\n ------ Contents" + Array.new(50).join('-')
   $conn.exec("SELECT * FROM contents") do |result|
      result.each do |row|
-        print "\n %6d %s" % row.values_at('id', 'description')
+        print "\n %6d %s" % row.values_at('id', 'content')
      end
   end
-  puts
-end
-
-
-
-#
-# Generate random content
-#
-def generateRandomContent (count)
-  for h in 1 .. count
-    content = "";
-    (8 + rand(42)).times{content << (97 + rand(26)).chr}
-    query = "INSERT INTO contents (content) VALUES('" + content + "')"
-    $conn.exec(query)
+  print "\n ------ Usershare" + Array.new(50).join('-')
+  $conn.exec("select userid, string_agg(concat(contentid), ',') from usershare group by userid order by userid") do |result|
+     result.each do |row|
+        print "\n %6d %s" % row.values_at('userid', 'string_agg')
+     end
+  end
+  print "\n ------ Userkill" + Array.new(50).join('-')
+  $conn.exec("select userid, string_agg(concat(contentid), ' ') from userkill group by userid order by userid") do |result|
+     result.each do |row|
+        print "\n %6d %s" % row.values_at('userid', 'string_agg')
+     end
   end
 end
+
+
+
+#
+# Generate random content.  Returns ID
+#
+def generateAndInsertNewContent ()
+  ## Generate a random string between 8 and 50 characters long
+  content = "";
+  (8 + rand(42)).times{content << (97 + rand(26)).chr}
+
+  ## Insert a new row into contents table
+  query = "INSERT INTO contents (content) VALUES('#{content}') returning id"
+  ret = $conn.exec(query)
+
+  ## Consider and return the new row id
+  ret[0]['id']
+end
+
+
+#
+# Spread new content to all accounts
+#
+def _spreadNewContentGloballyInit
+  query = "PREPARE seen  (bigint, bigint) AS INSERT INTO userseen VALUES($1, $2)"
+  $conn.exec(query)
+
+  query = "PREPARE share (bigint, bigint) AS INSERT INTO usershare VALUES($1, $2)"
+  $conn.exec(query)
+
+  query = "PREPARE kill  (bigint, bigint) AS INSERT INTO userkill VALUES($1, $2)"
+  $conn.exec(query)
+end
+
+$users2likes = Array.new(100)
+100.times {|y| $users2likes[y] = Array.new(100,0)}
+
+def spreadNewContentGlobally label
+  timeStart = Time.now
+  ## Consider new content.  Consider the "id"
+  idNewContent = generateAndInsertNewContent 
+
+  ## Get ids of all users
+  query = "SELECT id FROM accounts"
+  idsAccounts = $conn.exec(query)
+
+  ## Assign user the new conent
+  query = ""
+  idsAccounts.each {|idAccount|
+    idAccount = idAccount['id'] ## Reconsider k account id from hash {"id"=>"42"}
+    query += ";INSERT INTO userseen VALUES(#{idAccount}, #{idNewContent})"
+    $users2likes[idAccount.to_i] ||= Array.new(100,0)
+    # Users 1 and 3 vote the same
+    if idAccount == "3"
+      case $users2likes[1][idNewContent.to_i]
+        when 1
+          query += ";EXECUTE share (#{idAccount}, #{idNewContent})"
+          $users2likes[idAccount.to_i][idNewContent.to_i] = 1
+        when -1
+          query += ";EXECUTE kill (#{idAccount}, #{idNewContent})"
+          $users2likes[idAccount.to_i][idNewContent.to_i] = -1
+      end
+    elsif idAccount == "5"
+      query += ";EXECUTE share (#{idAccount}, #{idNewContent})"
+      $users2likes[idAccount.to_i][idNewContent.to_i] = 1
+    elsif idAccount == "6"
+      query += ";EXECUTE kill (#{idAccount}, #{idNewContent})"
+      $users2likes[idAccount.to_i][idNewContent.to_i] = -1
+    elsif idAccount == "7"
+    else
+      case rand 100
+        when 0..10
+          #query += ";INSERT INTO usershare VALUES(#{idAccount}, #{idNewContent})"
+          query += ";EXECUTE share (#{idAccount}, #{idNewContent})"
+          $users2likes[idAccount.to_i][idNewContent.to_i] = 1
+        when 20..30
+          #query += ";INSERT INTO userkill VALUES(#{idAccount}, #{idNewContent})"
+          query += ";EXECUTE kill (#{idAccount}, #{idNewContent})"
+          $users2likes[idAccount.to_i][idNewContent.to_i] = -1
+        else
+      end
+    end
+  }
+  $conn.send_query(query)
+  print label, " ", Time.now - timeStart, " seconds.\n"
+  STDOUT.flush
+end
+
 
 #
 # Force share to all
 #
-def forceShareToAllUsers (id)
+def shareAllRandomly (id)
 end
 
+
+
+def dumpLikeGraph
+  puts "** Like/Dislike Graph ****"
+  $users2likes.each {|row| row.each{|x| print "- *"[x+1]} ; puts }
+end
 
 
 #
 # Main
 #
-$conn = PG.connect(dbname: 'freelogue')    # Create DB connection
-
 timeStart = Time.now
-
-#resetTables
-#generateRandomUsers C10
-#generateRandomContent C10
-#dumpDataTables
-
+resetTables
+generateRandomUsers $howMany
+_spreadNewContentGloballyInit
+$howMany.times {|x| spreadNewContentGlobally "#{x}/#{$howMany}"}
+dumpLikeGraph
+dumpDataTables
 $conn.close
-print  Time.now - timeStart, " seconds."
+print  "\n\n", Time.now - timeStart, " seconds."

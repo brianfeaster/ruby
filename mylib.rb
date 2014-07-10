@@ -1,19 +1,28 @@
+require 'redis'
+
 module MyLib
-  def self.dumpRedis
-    puts "\n--Redis dump----"
+  def self.dumpRedis *args
+    pattern = args[0]
+    pattern ||= '*'
     r = Redis.new
-    r.keys('*').each do |x|
+    print "\n\n--Redis dump----\n"
+    r.keys(pattern).each do |x|
+      print r.type(x), " ", x, " = "
       case r.type(x)
         when 'string'
           val = r.get(x);
-          print x, " = ", val, "\n"
         when 'list'
           val = r.lrange(x, 0, -1)
-          print x, " |= ", val, "\n"
         when 'hash'
           val = r.hkeys(x)
-          print x, " @= ", val, "\n"
+        when 'set'
+          val = r.smembers(x)
+        when 'zset'
+          val = r.zrange(x, 0, -1)
+        else
+          val = "???"
       end # case r.type
+      print val, "\n"
     end # r.keys
     STDOUT.flush
   end # def self.dumpRedis
