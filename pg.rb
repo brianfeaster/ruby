@@ -241,11 +241,11 @@ end
 # Main
 #
 timeStart = Time.now
-resetTables
-generateRandomUsers $howMany
-_spreadNewContentGloballyInit
-$howMany.times {|x| spreadNewContentGlobally "#{x}/#{$howMany}"}
-dumpLikeGraph
+#resetTables
+#generateRandomUsers $howMany
+#_spreadNewContentGloballyInit
+#$howMany.times {|x| spreadNewContentGlobally "#{x}/#{$howMany}"}
+#dumpLikeGraph
 dumpDataTables
 $conn.close
 print  "\n\n", Time.now - timeStart, " seconds."
