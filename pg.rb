@@ -15,7 +15,9 @@ C100M = C10M  * C10
 
 
 $howMany = C100 
-$conn = PG.connect(dbname: 'freelogue')    # Create DB connection
+# $conn = PG.connect(dbname: 'freelogue')    # Create DB connection
+# $conn = PG.connect(dbname:'ebdb', user:'ebroot', host:'aa1d5p2qk332h28.c2hupyavk0ik.us-west-2.rds.amazonaws.com', password:'freelogue2014')    # Create DB connection
+$conn = PG.connect(dbname: 'postgres')    # Create DB connection
 
 
 #
@@ -109,28 +111,34 @@ end
 # Debug dump the account and content tables
 #
 def dumpDataTables
-  print " ------ Accounts" + Array.new(34).join('-') + " " + Array.new(21).join('-')
-  $conn.exec("SELECT * FROM accounts") do |result|
+  print " ------ users" + Array.new(34).join('-') + " " + Array.new(21).join('-')
+  $conn.exec("SELECT * FROM users order by id") do |result|
      result.each do |row|
-        print "\n %6d %-33s %-20s" % row.values_at('id', 'email', 'name')
+        print "\n %6d %-33s " % row.values_at('id', 'email')
      end
   end
-  print "\n ------ Contents" + Array.new(50).join('-')
-  $conn.exec("SELECT * FROM contents") do |result|
+  print "\n ------ contents" + Array.new(50).join('-')
+  $conn.exec("SELECT * FROM contents order by id") do |result|
      result.each do |row|
-        print "\n %6d %s" % row.values_at('id', 'content')
+        print "\n %6d %s" % row.values_at('id', 'text')
      end
   end
-  print "\n ------ Usershare" + Array.new(50).join('-')
-  $conn.exec("select userid, string_agg(concat(contentid), ',') from usershare group by userid order by userid") do |result|
+  print "\n ------ user_responses SHARE" + Array.new(50).join('-')
+  $conn.exec("select user_id, string_agg(concat(content_id), ',') from user_responses where response = TRUE group by user_id order by user_id") do |result|
      result.each do |row|
-        print "\n %6d %s" % row.values_at('userid', 'string_agg')
+        print "\n %6d %s" % row.values_at('user_id', 'string_agg')
      end
   end
-  print "\n ------ Userkill" + Array.new(50).join('-')
-  $conn.exec("select userid, string_agg(concat(contentid), ' ') from userkill group by userid order by userid") do |result|
+  print "\n ------ user_responses KILL" + Array.new(50).join('-')
+  $conn.exec("select user_id, string_agg(concat(content_id), ',') from user_responses where response = FALSE group by user_id order by user_id") do |result|
      result.each do |row|
-        print "\n %6d %s" % row.values_at('userid', 'string_agg')
+        print "\n %6d %s" % row.values_at('user_id', 'string_agg')
+     end
+  end
+  print "\n ------ user_responses IGNORE" + Array.new(50).join('-')
+  $conn.exec("select user_id, string_agg(concat(content_id), ',') from user_responses where response ISNULL group by user_id order by user_id") do |result|
+     result.each do |row|
+        print "\n %6d %s" % row.values_at('user_id', 'string_agg')
      end
   end
 end
